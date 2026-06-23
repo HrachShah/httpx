@@ -405,7 +405,12 @@ class URL:
         import collections
         import warnings
 
-        warnings.warn("URL.raw is deprecated.")
+        warnings.warn(
+            "`URL.raw` is deprecated. Use `URL.raw_scheme`, "
+            "`URL.raw_host`, `URL.port`, and `URL.raw_path` directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         RawURL = collections.namedtuple(
             "RawURL", ["raw_scheme", "raw_host", "port", "raw_path"]
         )
