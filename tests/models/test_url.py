@@ -861,3 +861,18 @@ def test_ipv6_url_copy_with_host(url_str, new_host):
     assert url.host == "::ffff:192.168.0.1"
     assert url.netloc == b"[::ffff:192.168.0.1]:1234"
     assert str(url) == "http://[::ffff:192.168.0.1]:1234"
+
+
+def test_url_raw_is_deprecated() -> None:
+    url = httpx.URL("https://example.com:8443/path")
+    with pytest.warns(DeprecationWarning) as record:
+        raw = url.raw
+    assert len(record) == 1
+    warning = record[0]
+    # Make sure the warning points to the caller, not to the httpx internals
+    assert warning.filename == __file__
+    # And the namedtuple still has the legacy fields
+    assert raw.raw_scheme == b"https"
+    assert raw.raw_host == b"example.com"
+    assert raw.port == 8443
+    assert raw.raw_path == b"/path"

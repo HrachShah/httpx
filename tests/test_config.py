@@ -1,11 +1,13 @@
 import ssl
 import typing
+import warnings
 from pathlib import Path
 
 import certifi
 import pytest
 
 import httpx
+from httpx._config import create_ssl_context
 
 
 def test_load_ssl_config():
@@ -182,3 +184,41 @@ def test_proxy_with_auth_from_url():
 def test_invalid_proxy_scheme():
     with pytest.raises(ValueError):
         httpx.Proxy("invalid://example.com")
+
+
+def test_create_ssl_context_verify_str_deprecation(cert_pem_file: typing.Any) -> None:
+    with pytest.warns(DeprecationWarning) as record:
+        create_ssl_context(verify=cert_pem_file)
+    assert len(record) == 1
+    message = str(record[0].message)
+    assert "verify=<str>" in message
+    assert "deprecated" in message
+    # stacklevel=2 means the warning filename is the test file, not httpx internals
+    assert record[0].filename == __file__
+
+
+def test_create_ssl_context_cert_deprecation(
+    cert_pem_file: typing.Any,
+    cert_private_key_file: typing.Any,
+) -> None:
+    # The deprecation path is marked `# pragma: nocover` upstream
+    # and is exercised here only to assert the DeprecationWarning contract.
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    with pytest.warns(DeprecationWarning) as record:
+        try:
+            create_ssl_context(cert=(cert_pem_file, cert_private_key_file))
+        except ssl.SSLError:
+            pass
+    assert len(record) == 1
+    message = str(record[0].message)
+    assert "`cert=...`" in message
+    assert "deprecated" in message
+    assert record[0].filename == __file__
+
+
+def test_create_ssl_context_no_deprecation_warning() -> None:
+    # The default path (verify=True, cert=None) must not emit any DeprecationWarning.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        context = create_ssl_context()
+    assert context.verify_mode == ssl.VerifyMode.CERT_REQUIRED

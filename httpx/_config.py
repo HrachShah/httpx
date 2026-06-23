@@ -48,7 +48,7 @@ def create_ssl_context(
             "Use `verify=ssl.create_default_context(cafile=...)` "
             "or `verify=ssl.create_default_context(capath=...)` instead."
         )
-        warnings.warn(message, DeprecationWarning)
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
         if os.path.isdir(verify):
             return ssl.create_default_context(capath=verify)
         return ssl.create_default_context(cafile=verify)
@@ -60,7 +60,7 @@ def create_ssl_context(
             "`cert=...` is deprecated. Use `verify=<ssl_context>` instead,"
             "with `.load_cert_chain()` to configure the certificate chain."
         )
-        warnings.warn(message, DeprecationWarning)
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
         if isinstance(cert, str):
             ctx.load_cert_chain(cert)
         else:
