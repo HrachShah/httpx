@@ -104,6 +104,27 @@ def test_digest_auth_with_401_nonce_counting():
         flow.send(response)
 
 
+def test_digest_auth_with_empty_unquoted_realm():
+    # Regression: a WWW-Authenticate header with an empty unquoted field
+    # (e.g. "Digest realm=,nonce=") used to raise IndexError out of
+    # the digest challenge parser. The parser must now accept these
+    # inputs without raising IndexError, even if the resulting digest
+    # computation is meaningless.
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+
+    flow = auth.sync_auth_flow(request)
+    request = next(flow)
+    assert "Authorization" not in request.headers
+
+    headers = {"WWW-Authenticate": "Digest realm=,nonce="}
+    response = httpx.Response(
+        content=b"Auth required", status_code=401, headers=headers, request=request
+    )
+    request = flow.send(response)
+    assert request.headers["Authorization"].startswith("Digest")
+
+
 def set_cookies(request: httpx.Request) -> httpx.Response:
     headers = {
         "Set-Cookie": "session=.session_value...",

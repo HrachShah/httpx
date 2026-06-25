@@ -6,7 +6,7 @@ import random
 import pytest
 
 import httpx
-from httpx._utils import URLPattern, get_environment_proxies
+from httpx._utils import URLPattern, get_environment_proxies, unquote
 
 
 @pytest.mark.parametrize(
@@ -148,3 +148,20 @@ def test_pattern_priority():
         URLPattern("http://"),
         URLPattern("all://"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        ("hello", "hello"),
+        ('"hello"', "hello"),
+        ('""', ""),
+        ('"', '"'),
+        ("", ""),
+        ('"a"b"', 'a"b'),
+    ),
+)
+def test_unquote(value, expected):
+    # Regression: unquote previously raised IndexError on empty strings and
+    # single-character input. It also raised IndexError on strings of length 1.
+    assert unquote(value) == expected
