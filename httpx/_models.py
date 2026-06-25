@@ -111,18 +111,31 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
     value = value.strip(replace_chars)
     if not value:
         return links
-    for val in re.split(", *<", value):
-        try:
-            url, params = val.split(";", 1)
-        except ValueError:
-            url, params = val, ""
-        link = {"url": url.strip("<> '\"")}
-        for param in params.split(";"):
-            try:
-                key, value = param.split("=")
-            except ValueError:
-                break
-            link[key.strip(replace_chars)] = value.strip(replace_chars)
+    # Find each '<...>' block in the header. ``re.split(", *<", ...)``
+    # is fragile against empty/trailing/double commas: ``"<a>,, <b>"``
+    # splits to ``["<a>", ", ", "b>"]``, which produced links with the
+    # URL ``","`` and ``"a>,"`` respectively. Iterating over the actual
+    # angle-bracketed URL references is simpler and lets us ignore
+    # malformed separators between them.
+    for url_end in re.finditer(r"<([^>]*)>", value):
+        raw_url = url_end.group(1).strip().strip(replace_chars)
+        if not raw_url:
+            continue
+        tail = value[url_end.end():]
+        # Parameters for this link are everything up to the next '<'
+        # (start of the next link) or end of header.
+        next_lt = tail.find("<")
+        params_blob = tail if next_lt == -1 else tail[:next_lt]
+        # Trim a trailing separator (comma) so we don't keep parsing
+        # beyond the current link.
+        params_blob = params_blob.rstrip(" ,")
+        link: dict[str, str] = {"url": raw_url}
+        for param in params_blob.split(";"):
+            param = param.strip()
+            if not param or "=" not in param:
+                continue
+            key, param_value = param.split("=", 1)
+            link[key.strip(replace_chars)] = param_value.strip(replace_chars)
         links.append(link)
     return links
 

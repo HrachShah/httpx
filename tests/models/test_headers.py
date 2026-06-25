@@ -217,3 +217,64 @@ def test_parse_header_links(value, expected):
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        ",",
+        ",,",
+        ",,,",
+        "<http:/.../a>; ,<http:/.../b>",
+        "<http:/.../a>,,,<http:/.../b>",
+        "<http:/.../a>,",
+        ",<http:/.../a>",
+        "<http:/.../a>; foo,<http:/.../b>,",
+    ),
+)
+def test_parse_header_links_skips_blank_or_trailing_separators(value):
+    """A header like ``\"<a>,, <b>\"`` or ``\"<a>,\"`` previously leaked
+    malformed entries whose URL was a literal ``\",\"`` or ``\"a>,\"``.
+    Blank segments and trailing separators should now be ignored."""
+    response = httpx.Response(200, headers={"link": value})
+    links = response.links
+    for link in links.values():
+        # No link's URL should consist of just a separator character.
+        assert link["url"].strip(" ,"), (
+            f"link url should not be a bare separator: {link!r}"
+        )
+        assert ">" not in link["url"], (
+            f"link url should not contain a stray '>': {link!r}"
+        )
+        assert "," not in link["url"], (
+            f"link url should not contain a stray ',': {link!r}"
+        )
+
+
+def test_parse_header_links_two_links_with_double_comma_between():
+    """``<http:/.../a>,, <http:/.../b>`` should yield exactly two links
+    with the correct URLs and parameters, not three (the broken
+    implementation produced a stray ``","`` link or merged ``<b>`` onto
+    the previous link's URL)."""
+    response = httpx.Response(
+        200,
+        headers={"link": "<http:/.../a>,, <http:/.../b>; rel=\"next\""},
+    )
+    link_values = list(response.links.values())
+    assert len(link_values) == 2
+    urls = {link["url"] for link in link_values}
+    assert urls == {"http:/.../a", "http:/.../b"}
+    next_link = next(l for l in link_values if l["url"] == "http:/.../b")
+    assert next_link == {"url": "http:/.../b", "rel": "next"}
+
+
+def test_parse_header_links_double_comma_no_params_for_second():
+    """``<a>,,<b>`` (no params, no spaces) should not concatenate ``<b>`` onto
+    the previous link's URL. Both URLs must be parsed correctly."""
+    response = httpx.Response(
+        200,
+        headers={"link": "<http:/.../a>,,<http:/.../b>"},
+    )
+    link_values = list(response.links.values())
+    assert len(link_values) == 2
+    assert {l["url"] for l in link_values} == {"http:/.../a", "http:/.../b"}
