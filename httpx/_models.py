@@ -354,9 +354,18 @@ class Headers(typing.MutableMapping[str, str]):
         return len(self._list)
 
     def __eq__(self, other: typing.Any) -> bool:
+        # Return NotImplemented for types we know we cannot compare against
+        # so Python's comparison machinery falls back to the right-hand
+        # operand's __eq__ (and ultimately returns False). Without this,
+        # `Headers(...) == <non-iterable>` would propagate the TypeError
+        # raised by `Headers(other)` instead of returning False, which
+        # violates the contract that __eq__ should never raise for
+        # unknown types.
+        if not isinstance(other, (Headers, Mapping, list, tuple)):
+            return NotImplemented
         try:
             other_headers = Headers(other)
-        except ValueError:
+        except (TypeError, ValueError):
             return False
 
         self_list = [(key, value) for _, key, value in self._list]
