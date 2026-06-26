@@ -217,3 +217,55 @@ def test_parse_header_links(value, expected):
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
+
+
+class TestEquality:
+    """
+    `Headers.__eq__` must return False (never raise) when compared
+    against an object whose type it cannot sensibly convert. Returning
+    NotImplemented for types we know we cannot compare against lets Python
+    fall back to the right-hand operand's `__eq__`.
+    """
+
+    def test_eq_returns_false_against_non_iterable_scalars(self):
+        h = httpx.Headers({"a": "1"})
+        # The previous implementation constructed `Headers(other)` for every
+        # value, which raised `TypeError: 'int' object is not iterable`. After
+        # the fix, comparisons against scalars, bytes, and None must return
+        # False instead of raising.
+        assert (h == 42) is False
+        assert (h == 3.14) is False
+        assert (h == b"a") is False
+        assert (h == None) is False  # noqa: E711
+        # And the symmetric direction.
+        assert (42 == h) is False
+        assert (None == h) is False  # noqa: E711
+
+    def test_eq_returns_false_against_non_pair_iterables(self):
+        h = httpx.Headers({"a": "1"})
+        # Sets, generators of scalars, and single-element lists are iterable
+        # but not a `(key, value)` sequence. The old implementation tried
+        # `Headers({"a"})` which raised `TypeError: 'set' object is not
+        # iterable` when destructured as `(k, v)`. After the fix these must
+        # return False.
+        assert (h == {"a"}) is False
+        assert (h == [1, 2, 3]) is False
+        assert (h == (i for i in range(3))) is False
+        # Symmetric direction.
+        assert ({"a"} == h) is False
+
+    def test_eq_returns_false_against_string(self):
+        # Pre-existing behaviour: `Headers(...) == "a: 1"` must be False.
+        # This case used to work because `Headers("a: 1")` raised ValueError;
+        # pin it so the new isinstance fast-path keeps handling it.
+        h = httpx.Headers({"a": "1"})
+        assert (h == "a: 1") is False
+        assert (h == "a: 1\nb: 2") is False
+
+    def test_eq_returns_true_against_equivalent_headers(self):
+        # Sanity-check: the legitimate comparison paths still work end-to-end.
+        h = httpx.Headers([("a", "123"), ("a", "456"), ("b", "789")])
+        assert h == httpx.Headers([("a", "123"), ("a", "456"), ("b", "789")])
+        assert h == [("a", "123"), ("b", "789"), ("a", "456")]
+        assert h == [("a", "123"), ("A", "456"), ("b", "789")]
+        assert h == {"a": "123", "A": "456", "b": "789"}
