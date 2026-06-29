@@ -255,6 +255,23 @@ def test_url_invalid_port():
     assert str(exc.value) == "Invalid port: 'abc'"
 
 
+@pytest.mark.parametrize(
+    "port",
+    ["-1", "65536", "99999"],
+)
+def test_url_out_of_range_port(port):
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL(f"https://example.com:{port}/")
+    assert str(exc.value) == f"Invalid port: '{port}' (must be in the range 0-65535)"
+
+
+@pytest.mark.parametrize("port", ["0", "65535"])
+def test_url_in_range_boundary_port(port):
+    # 0 and 65535 are valid TCP/UDP ports; they must NOT be rejected.
+    url = httpx.URL(f"https://example.com:{port}/")
+    assert url.port == int(port)
+
+
 # Tests for path handling
 
 

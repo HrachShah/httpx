@@ -410,6 +410,15 @@ def normalize_port(port: str | int | None, scheme: str) -> int | None:
     except ValueError:
         raise InvalidURL(f"Invalid port: {port!r}")
 
+    # The TCP/UDP port range is 0..65535. Anything outside that range
+    # can never be opened on a real socket, so reject it here instead of
+    # letting it bubble up as a confusing ``OSError: [Errno 22] Invalid
+    # argument`` from the transport layer.
+    if not 0 <= port_as_int <= 65535:
+        raise InvalidURL(
+            f"Invalid port: {port!r} (must be in the range 0-65535)"
+        )
+
     # See https://url.spec.whatwg.org/#url-miscellaneous
     default_port = {"ftp": 21, "http": 80, "https": 443, "ws": 80, "wss": 443}.get(
         scheme
