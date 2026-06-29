@@ -255,6 +255,50 @@ def test_url_invalid_port():
     assert str(exc.value) == "Invalid port: 'abc'"
 
 
+@pytest.mark.parametrize(
+    ("port", "origin"),
+    [
+        pytest.param(-1, "https://example.com:-1", id="negative-int"),
+        pytest.param(65536, "https://example.com:65536", id="max-plus-one"),
+        pytest.param(99999, "https://example.com:99999", id="large-positive"),
+        pytest.param(2**31, "https://example.com:2147483648", id="max-32bit"),
+    ],
+)
+def test_url_port_out_of_range_rejected(port: int, origin: str) -> None:
+    # RFC 3986 §3.2.3 defines port as *DIGIT and the valid range as 0-65535.
+    # `httpx.URL(...)` previously accepted any int without bounds, including
+    # negative values and integers well above 65535, silently storing the
+    # value in `port` and round-tripping it through `str(url)`.
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL(origin)
+    assert str(exc.value) == f"Invalid port: '{port}'"
+
+
+@pytest.mark.parametrize("port", [0, 80, 1234, 65535])
+def test_url_port_in_range_accepted(port: int) -> None:
+    # Boundary values are accepted (0 is the start of the valid range,
+    # 65535 is the inclusive end). 80 and 443 are the http/https defaults;
+    # they should be accepted but normalised to None by the existing
+    # default-port logic.
+    url = httpx.URL(f"http://example.com:{port}/")
+    if port in (80, 443):
+        assert url.port is None
+    else:
+        assert url.port == port
+
+
+def test_url_port_out_of_range_via_copy_with() -> None:
+    # The same range check must apply on `copy_with(port=...)`, not just on
+    # the constructor's string path. Previously a caller that did
+    # `httpx.URL("http://example.com/").copy_with(port=99999)` would get a
+    # URL whose `port` was 99999 and whose round-trip string contained
+    # ":99999".
+    url = httpx.URL("http://example.com/")
+    with pytest.raises(httpx.InvalidURL) as exc:
+        url.copy_with(port=99999)
+    assert str(exc.value) == "Invalid port: '99999'"
+
+
 # Tests for path handling
 
 
