@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, unquote, urlencode
 
 import idna
 
+from ._exceptions import InvalidURL
 from ._types import QueryParamTypes
 from ._urlparse import urlparse
 from ._utils import primitive_value_to_str
@@ -369,7 +370,21 @@ class URL:
         return hash(str(self))
 
     def __eq__(self, other: typing.Any) -> bool:
-        return isinstance(other, (URL, str)) and str(self) == str(URL(other))
+        if isinstance(other, URL):
+            return str(self) == str(other)
+        if isinstance(other, str):
+            # Compare against the parsed form of `other` instead of the raw
+            # string, so `URL("https://example.com/") == "https://example.com"`
+            # is True even though the rendered strings differ. If `other` is
+            # not a valid URL, parsing raises `InvalidURL` (a `ValueError`).
+            # Returning `False` rather than propagating the exception keeps
+            # `__eq__` safe to call from containers, `set`/`dict` lookups, and
+            # `sorted()` without callers having to wrap it in a try/except.
+            try:
+                return str(self) == str(URL(other))
+            except InvalidURL:
+                return False
+        return False
 
     def __str__(self) -> str:
         return str(self._uri_reference)

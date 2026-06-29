@@ -438,6 +438,27 @@ def test_url_eq_str():
     assert str(url) == url
 
 
+@pytest.mark.parametrize(
+    "other",
+    [
+        pytest.param("", id="empty-string"),
+        pytest.param("not a url", id="spaces"),
+        pytest.param("https://example.com:not-a-port", id="bad-port"),
+        pytest.param("https://[::1", id="unclosed-ipv6"),
+    ],
+)
+def test_url_eq_str_returns_false_for_invalid_string(other):
+    """
+    Comparing a `URL` to a string that is not parseable as a URL must return
+    `False` rather than raising `InvalidURL`. `__eq__` is invoked from
+    containers (`==`, `in`, `set`, `sorted`, etc.) where raising would
+    surface as a confusing error to callers.
+    """
+    url = httpx.URL("https://example.org/")
+    assert (url == other) is False
+    assert (other == url) is False
+
+
 def test_url_set():
     """
     Ensure that `httpx.URL` instances can be used in sets.
