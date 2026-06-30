@@ -62,6 +62,48 @@ def test_gzip():
     assert response.content == body
 
 
+def _gzip_members(*bodies):
+    """Return a single bytes value containing one gzip member per body,
+    concatenated back-to-back, the way a real server can legitimately
+    send a gzipped body that spans more than one member."""
+    out = b""
+    for body in bodies:
+        compressor = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+        out += compressor.compress(body)
+        out += compressor.flush()
+    return out
+
+
+def test_gzip_concatenated_members():
+    body = b"test 123"
+    compressed_body = _gzip_members(body, body)
+
+    headers = [(b"Content-Encoding", b"gzip")]
+    response = httpx.Response(
+        200,
+        headers=headers,
+        content=compressed_body,
+    )
+    assert response.content == body + body
+
+
+def test_gzip_concatenated_members_via_decoder():
+    body = _gzip_members(b"alpha", b"beta", b"gamma")
+    decoder = httpx._decoders.GZipDecoder()
+    out = decoder.decode(body[:5])
+    out += decoder.decode(body[5:25])
+    out += decoder.decode(body[25:])
+    out += decoder.flush()
+    assert out == b"alpha" + b"beta" + b"gamma"
+
+
+def test_gzip_three_members_one_call():
+    decoder = httpx._decoders.GZipDecoder()
+    decoded = decoder.decode(_gzip_members(b"x", b"y", b"z"))
+    decoded += decoder.flush()
+    assert decoded == b"xyz"
+
+
 def test_brotli():
     body = b"test 123"
     compressed_body = b"\x8b\x03\x80test 123\x03"
