@@ -299,6 +299,26 @@ def test_url_port_out_of_range_via_copy_with() -> None:
     assert str(exc.value) == "Invalid port: '99999'"
 
 
+def test_url_bool_port_rejected_with_typeerror() -> None:
+    # `bool` is a subclass of `int`, so an `isinstance(value, int)` type
+    # check would let `port=True` slip through. The previous flow then
+    # stringified the bool to "True" inside urlparse() and raised an
+    # InvalidURL with the confusing message "Invalid port: 'True'".
+    # Reject bool up front so the error matches the other wrong-type
+    # errors raised by the URL constructor and copy_with.
+    with pytest.raises(TypeError) as exc:
+        httpx.URL("https://example.com/", port=True)
+    assert str(exc.value) == "Argument 'port' must be int but got bool"
+    with pytest.raises(TypeError) as exc:
+        httpx.URL("https://example.com/", port=False)
+    assert str(exc.value) == "Argument 'port' must be int but got bool"
+
+    url = httpx.URL("https://example.com/")
+    with pytest.raises(TypeError) as exc:
+        url.copy_with(port=True)
+    assert str(exc.value) == "Argument 'port' must be int but got bool"
+
+
 # Tests for path handling
 
 

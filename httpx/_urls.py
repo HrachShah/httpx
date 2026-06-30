@@ -101,6 +101,21 @@ class URL:
                     seen = type(value).__name__
                     message = f"Argument {key!r} must be {expected} but got {seen}"
                     raise TypeError(message)
+                # bool is a subclass of int, so `port=True` would otherwise
+                # slip through the isinstance(value, int) check above and
+                # reach urlparse(), where str(port) renders the literal
+                # "True" and the eventual port normalization raises an
+                # InvalidURL with a confusing message. Reject bool up
+                # front so the error matches the one for other wrong
+                # types.
+                if (
+                    key == "port"
+                    and value is not None
+                    and isinstance(value, bool)
+                ):
+                    raise TypeError(
+                        "Argument 'port' must be int but got bool"
+                    )
                 if isinstance(value, bytes):
                     kwargs[key] = value.decode("ascii")
 
