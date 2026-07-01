@@ -40,9 +40,13 @@ def test_httpcore_exception_mapping(server: TestServer) -> None:
     """
     HTTPCore exception mapping works as expected.
     """
-    impossible_port = 123456
+    # Use 127.0.0.1 on a port that nothing is listening on so the connection
+    # is guaranteed to fail.
+    # (The previous test used port 123456, which is out of the valid TCP/UDP
+    # range and is now rejected at the URL boundary by normalize_port.)
+    unreachable = server.url.copy_with(host="127.0.0.1", port=1)
     with pytest.raises(httpx.ConnectError):
-        httpx.get(server.url.copy_with(port=impossible_port))
+        httpx.get(unreachable)
 
     with pytest.raises(httpx.ReadTimeout):
         httpx.get(

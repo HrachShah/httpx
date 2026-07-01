@@ -255,6 +255,49 @@ def test_url_invalid_port():
     assert str(exc.value) == "Invalid port: 'abc'"
 
 
+def test_url_port_above_max_raises():
+    # TCP/UDP port numbers are 16 bits (0..65535); values above 65535 are
+    # outside the valid range and must be rejected at the URL boundary
+    # rather than silently accepted and then failing at the socket layer
+    # much later.
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL("https://example.com:65536/")
+    assert str(exc.value) == "Invalid port: '65536'"
+
+
+def test_url_port_zero_accepted_per_whatwg():
+    # Port 0 is reserved for the "any local port" wildcard in bind()/socket()
+    # and is not a valid destination port for a connection.  The WHATWG URL
+    # spec still parses it (it is only an error at connect time), so
+    # `URL(...)` accepts it and `port` returns 0; the actual connect
+    # attempt is what surfaces the OS-level error.
+    assert httpx.URL("http://example.com:0/").port == 0
+
+
+def test_url_port_negative_raises():
+    # Negative port numbers parse as int but are not valid TCP/UDP ports.
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL("https://example.com:-1/")
+    assert str(exc.value) == "Invalid port: '-1'"
+
+
+def test_url_port_boundary_values_accepted():
+    # 1 and 65535 are both valid TCP/UDP port numbers and must round-trip.
+    assert httpx.URL("https://example.com:1/").port == 1
+    assert httpx.URL("https://example.com:65535/").port == 65535
+
+
+def test_url_port_int_constructor_validates_range():
+    # The port= keyword should also be range-checked, not just URL strings.
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL(scheme="https", host="example.com", port=65536)
+    assert str(exc.value) == "Invalid port: '65536'"
+
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL(scheme="https", host="example.com", port=-1)
+    assert str(exc.value) == "Invalid port: '-1'"
+
+
 # Tests for path handling
 
 

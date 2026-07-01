@@ -410,6 +410,18 @@ def normalize_port(port: str | int | None, scheme: str) -> int | None:
     except ValueError:
         raise InvalidURL(f"Invalid port: {port!r}")
 
+    # TCP/UDP port numbers are unsigned 16-bit integers (RFC 793 § 3.1, IANA
+    # service name and transport protocol port number registry).  Port 0
+    # parses successfully per the WHATWG URL spec (it's an error only at
+    # connect time), so we accept 0..65535 here.  Reject negative numbers
+    # and out-of-range positive values that int() will happily accept
+    # (e.g. "99999", "-1"); without this guard a URL like
+    # `http://example.com:99999/` constructs successfully but fails much
+    # later with a confusing socket-level error when the transport tries
+    # to connect.
+    if not 0 <= port_as_int <= 65535:
+        raise InvalidURL(f"Invalid port: {port!r}")
+
     # See https://url.spec.whatwg.org/#url-miscellaneous
     default_port = {"ftp": 21, "http": 80, "https": 443, "ws": 80, "wss": 443}.get(
         scheme
