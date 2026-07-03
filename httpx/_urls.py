@@ -431,34 +431,47 @@ class QueryParams(typing.Mapping[str, str]):
         if value is None or isinstance(value, (str, bytes)):
             value = value.decode("ascii") if isinstance(value, bytes) else value
             self._dict = parse_qs(value, keep_blank_values=True)
-        elif isinstance(value, QueryParams):
+            return
+        if isinstance(value, QueryParams):
             self._dict = {k: list(v) for k, v in value._dict.items()}
-        else:
-            dict_value: dict[typing.Any, list[typing.Any]] = {}
-            if isinstance(value, (list, tuple)):
-                # Convert list inputs like:
-                #     [("a", "123"), ("a", "456"), ("b", "789")]
-                # To a dict representation, like:
-                #     {"a": ["123", "456"], "b": ["789"]}
-                for item in value:
-                    dict_value.setdefault(item[0], []).append(item[1])
-            else:
-                # Convert dict inputs like:
-                #    {"a": "123", "b": ["456", "789"]}
-                # To dict inputs where values are always lists, like:
-                #    {"a": ["123"], "b": ["456", "789"]}
-                dict_value = {
-                    k: list(v) if isinstance(v, (list, tuple)) else [v]
-                    for k, v in value.items()
-                }
+            return
 
-            # Ensure that keys and values are neatly coerced to strings.
-            # We coerce values `True` and `False` to JSON-like "true" and "false"
-            # representations, and coerce `None` values to the empty string.
-            self._dict = {
-                str(k): [primitive_value_to_str(item) for item in v]
-                for k, v in dict_value.items()
+        if isinstance(value, (list, tuple)):
+            # Convert list inputs like:
+            #     [("a", "123"), ("a", "456"), ("b", "789")]
+            # To a dict representation, like:
+            #     {"a": ["123", "456"], "b": ["789"]}
+            dict_value: dict[typing.Any, list[typing.Any]] = {}
+            for item in value:
+                if not isinstance(item, (list, tuple)) or len(item) != 2:
+                    raise TypeError(
+                        "QueryParams list/tuple items must be 2-tuples of "
+                        f"(key, value), got {type(item).__name__}: {item!r}"
+                    )
+                dict_value.setdefault(item[0], []).append(item[1])
+        elif isinstance(value, typing.Mapping):
+            # Convert dict inputs like:
+            #    {"a": "123", "b": ["456", "789"]}
+            # To dict inputs where values are always lists, like:
+            #    {"a": ["123"], "b": ["456", "789"]}
+            dict_value = {
+                k: list(v) if isinstance(v, (list, tuple)) else [v]
+                for k, v in value.items()
             }
+        else:
+            raise TypeError(
+                "QueryParams requires a mapping, list of 2-tuples, "
+                "string, bytes, or QueryParams instance; "
+                f"got {type(value).__name__}: {value!r}"
+            )
+
+        # Ensure that keys and values are neatly coerced to strings.
+        # We coerce values `True` and `False` to JSON-like "true" and "false"
+        # representations, and coerce `None` values to the empty string.
+        self._dict = {
+            str(k): [primitive_value_to_str(item) for item in v]
+            for k, v in dict_value.items()
+        }
 
     def keys(self) -> typing.KeysView[str]:
         """

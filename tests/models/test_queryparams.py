@@ -87,6 +87,32 @@ def test_empty_query_params():
     assert str(q) == "a="
 
 
+def test_queryparam_rejects_invalid_scalar_types():
+    # Plain scalars (int, float, bool) used to leak AttributeError from
+    # the internal .items() call, which surfaced as
+    # AttributeError: 'int' object has no attribute 'items'. They
+    # should now raise TypeError with a clear message naming the
+    # supported inputs.
+    for value in (42, 3.14, True, False, object()):
+        with pytest.raises(TypeError) as exc_info:
+            httpx.QueryParams(value)
+        assert "QueryParams requires" in str(exc_info.value)
+
+
+def test_queryparam_rejects_malformed_list_items():
+    # A list of bare strings (rather than 2-tuples) used to leak
+    # IndexError: string index out of range from item[0]. The
+    # constructor should now validate each item and raise a clear
+    # TypeError instead.
+    with pytest.raises(TypeError) as exc_info:
+        httpx.QueryParams(["a", "b"])
+    assert "2-tuples" in str(exc_info.value)
+
+    # A 3-tuple is also invalid - same error path.
+    with pytest.raises(TypeError):
+        httpx.QueryParams([("a", "1", "extra")])
+
+
 def test_queryparam_update_is_hard_deprecated():
     q = httpx.QueryParams("a=123")
     with pytest.raises(RuntimeError):
