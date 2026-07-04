@@ -467,3 +467,70 @@ class TestHeaderParamHTML5Formatting:
         files = {"upload": (filename, b"<file content>")}
         request = httpx.Request("GET", "https://www.example.com", files=files)
         assert expected in request.read()
+
+@pytest.mark.parametrize(
+    ("content_type", "expected"),
+    [
+        # Bare boundary (regression for the existing happy path).
+        (b"multipart/form-data; boundary=abc", b"abc"),
+        # OWS around the value (the bug this fixes).
+        (b"multipart/form-data; boundary=  abc  ", b"abc"),
+        (b"multipart/form-data; boundary=\tabc\t", b"abc"),
+        # OWS around quoted value, internal whitespace preserved.
+        (b'multipart/form-data; boundary=  "abc def"  ', b"abc def"),
+        # Quoted value without surrounding OWS.
+        (b'multipart/form-data; boundary="abc"', b"abc"),
+        # Unquoted value with no internal whitespace.
+        (b"multipart/form-data; boundary=abc", b"abc"),
+        # Value with internal whitespace must remain quoted.
+        (b'multipart/form-data; boundary="  abc  "', b"  abc  "),
+    ],
+)
+def test_get_multipart_boundary_from_content_type(content_type, expected):
+    from httpx._multipart import get_multipart_boundary_from_content_type
+
+    assert get_multipart_boundary_from_content_type(content_type) == expected
+
+
+def test_get_multipart_boundary_from_content_type_without_semicolon():
+    from httpx._multipart import get_multipart_boundary_from_content_type
+
+    assert (
+        get_multipart_boundary_from_content_type(b"multipart/form-data; charset=utf-8")
+        is None
+    )
+
+
+def test_get_multipart_boundary_from_content_type_non_multipart():
+    from httpx._multipart import get_multipart_boundary_from_content_type
+
+    assert (
+        get_multipart_boundary_from_content_type(b"application/json; boundary=abc")
+        is None
+    )
+
+
+def test_multipart_explicit_boundary_with_owrks_around_value():
+    """An explicit boundary with whitespace around it must be parsed and used
+    as the body delimiter. Regression test for the case where a server or proxy
+    returned a Content-Type with OWS around the boundary value, which used
+    to leak the whitespace into the rendered multipart body and made the
+    closing boundary impossible to find on the receiving side."""
+    import io
+
+    client = httpx.Client(transport=httpx.MockTransport(echo_request_content))
+    files = {"file": io.BytesIO(b"<file content>")}
+    headers = {"content-type": "multipart/form-data; boundary=  +++  "}
+    response = client.post("http://127.0.0.1:8000/", files=files, headers=headers)
+    boundary_bytes = b"+++"
+    assert response.status_code == 200
+    assert response.content == b"".join(
+        [
+            b"--" + boundary_bytes + b"\r\n",
+            b'Content-Disposition: form-data; name="file"; filename="upload"\r\n',
+            b"Content-Type: application/octet-stream\r\n",
+            b"\r\n",
+            b"<file content>\r\n",
+            b"--" + boundary_bytes + b"--\r\n",
+        ]
+    )

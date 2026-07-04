@@ -63,7 +63,17 @@ def get_multipart_boundary_from_content_type(
     if b";" in content_type:
         for section in content_type.split(b";"):
             if section.strip().lower().startswith(b"boundary="):
-                return section.strip()[len(b"boundary=") :].strip(b'"')
+                raw_value = section.strip()[len(b"boundary="):]
+                # RFC 7230 allows OWS around the parameter value: trim it
+                # from both ends before unwrapping the optional double
+                # quotes. Without this, ``boundary=  abc  `` would yield
+                # the whitespace-padded string instead of ``b"abc"`` and
+                # the body stream would later fail to find the closing
+                # boundary.
+                value = raw_value.strip()
+                if len(value) >= 2 and value.startswith(b'"') and value.endswith(b'"'):
+                    value = value[1:-1]
+                return value
     return None
 
 
