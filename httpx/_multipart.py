@@ -62,8 +62,13 @@ def get_multipart_boundary_from_content_type(
     # https://www.rfc-editor.org/rfc/rfc2046#section-5.1.1
     if b";" in content_type:
         for section in content_type.split(b";"):
-            if section.strip().lower().startswith(b"boundary="):
-                return section.strip()[len(b"boundary=") :].strip(b'"')
+            name_value = section.strip()
+            if not name_value:
+                continue
+            key, sep, value = name_value.partition(b"=")
+            if sep != b"=" or key.strip().lower() != b"boundary":
+                continue
+            return value.strip().strip(b'"')
     return None
 
 

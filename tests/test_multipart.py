@@ -467,3 +467,40 @@ class TestHeaderParamHTML5Formatting:
         files = {"upload": (filename, b"<file content>")}
         request = httpx.Request("GET", "https://www.example.com", files=files)
         assert expected in request.read()
+
+
+def test_multipart_boundary_param_tolerates_ows_and_case():
+    """The boundary= parameter may use OWS around the = and any case.
+
+    RFC 2046 §5.1.1 only requires the literal `boundary=` substring, but
+    several real-world servers emit `BOUNDARY=`, `Boundary=`, or pad
+    whitespace around the `=`. The parser used to look for the exact
+    `boundary=` prefix and so returned None for these inputs, which
+    silently swapped in a random boundary on the request side and made
+    multipart requests fail to round-trip with a server that was waiting
+    for the original value.
+    """
+    from httpx._multipart import get_multipart_boundary_from_content_type
+
+    # All of these should parse out to the same boundary value.
+    for ct in (
+        b"multipart/form-data; boundary=abc",
+        b"multipart/form-data; BOUNDARY=abc",
+        b"multipart/form-data; Boundary=abc",
+        b"multipart/form-data;  boundary  =  abc",
+        b"multipart/form-data; boundary = abc",
+        b"multipart/form-data; boundary = \"abc\"",
+    ):
+        assert get_multipart_boundary_from_content_type(ct) == b"abc", ct
+
+
+def test_multipart_boundary_param_skips_non_boundary_section():
+    """`boundary=` only matches the boundary parameter, not random words."""
+    from httpx._multipart import get_multipart_boundary_from_content_type
+
+    assert get_multipart_boundary_from_content_type(
+        b"multipart/form-data; charset=utf-8"
+    ) is None
+    assert get_multipart_boundary_from_content_type(
+        b"multipart/form-data; charset=boundary"
+    ) is None
