@@ -391,6 +391,11 @@ def test_url_invalid_hostname():
         httpx.URL("https://😇/")
 
 
+def test_url_unclosed_ipv6_bracket():
+    with pytest.raises(httpx.InvalidURL):
+        httpx.URL("https://[::1")
+
+
 def test_url_excessively_long_url():
     with pytest.raises(httpx.InvalidURL) as exc:
         httpx.URL("https://www.example.com/" + "x" * 100_000)

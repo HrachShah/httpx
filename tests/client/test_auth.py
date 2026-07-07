@@ -770,3 +770,63 @@ def test_sync_auth() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"auth": "sync-auth"}
+
+
+
+@pytest.mark.anyio
+async def test_auth_tuple_wrong_length_raises_typeerror() -> None:
+    """
+    A tuple passed as `auth` must be a (username, password) pair. A 1-tuple,
+    0-tuple, 3-tuple, etc. used to leak `IndexError` from `auth[1]`, or
+    silently accepted the prefix and dropped the rest. Reject anything that
+    is not exactly a 2-tuple with a clear TypeError that names the bad
+    length.
+    """
+    app = App()
+
+    # 1-tuple: previously raised IndexError("tuple index out of range").
+    with pytest.raises(TypeError, match=r"tuple of length 1"):
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(app),
+            auth=("user",),  # type: ignore[arg-type]
+        )
+
+    # 0-tuple: previously raised IndexError as well.
+    with pytest.raises(TypeError, match=r"tuple of length 0"):
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(app),
+            auth=(),  # type: ignore[arg-type]
+        )
+
+    # 3-tuple: previously silently dropped the extra elements and built
+    # BasicAuth from the first two.
+    with pytest.raises(TypeError, match=r"tuple of length 3"):
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(app),
+            auth=("user", "pass", "extra"),  # type: ignore[arg-type]
+        )
+
+    # Same checks for the per-request `auth=` argument.
+    async with httpx.AsyncClient(transport=httpx.MockTransport(app)) as client:
+        with pytest.raises(TypeError, match=r"tuple of length 1"):
+            await client.get("https://example.org/", auth=("user",))  # type: ignore[arg-type]
+
+    # And for the sync client.
+    with pytest.raises(TypeError, match=r"tuple of length 1"):
+        httpx.Client(
+            transport=httpx.MockTransport(app),
+            auth=("user",),  # type: ignore[arg-type]
+        )
+
+    # And for the `client.auth =` setter path.
+    async with httpx.AsyncClient(transport=httpx.MockTransport(app)) as client:
+        with pytest.raises(TypeError, match=r"tuple of length 1"):
+            client.auth = ("user",)  # type: ignore[arg-type]
+
+    # 2-tuples still work as before.
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(app),
+        auth=("user", "pass"),
+    )
+    assert isinstance(client.auth, httpx.BasicAuth)
+    assert client.auth._auth_header == "Basic dXNlcjpwYXNz"
