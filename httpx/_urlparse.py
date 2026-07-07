@@ -349,6 +349,20 @@ def encode_host(host: str) -> str:
     if not host:
         return ""
 
+    # Reject a host that opens an IPv6 bracket without closing it. The
+    # AUTHORITY_REGEX used in `urlparse` is greedy: it captures everything
+    # between the first '[' and the LAST ']' as the IPv6 host, which means
+    # a URL like `http://[::1` is split into host='[' and port=':1' and
+    # then rejected deep inside `normalize_port` with the misleading
+    # message "Invalid port: ':1'". The same is true for any
+    # square-bracket mismatch such as `http://[::1:80` (no closing
+    # bracket at all). The WHATWG URL parser explicitly rejects these
+    # inputs, so we mirror that behaviour here and surface the
+    # bracket-mismatch as the actual problem rather than burying it
+    # behind a downstream "invalid port" error.
+    if host.startswith("[") and not host.endswith("]"):
+        raise InvalidURL(f"Invalid IPv6 address: {host!r}")
+
     elif IPv4_STYLE_HOSTNAME.match(host):
         # Validate IPv4 hostnames like #.#.#.#
         #
