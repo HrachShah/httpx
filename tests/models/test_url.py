@@ -263,6 +263,15 @@ def test_url_normalized_path():
     assert url.path == "/abc/ghi/jkl"
 
 
+def test_url_path_dots_preserve_root():
+    """Dot segments that climb above the root should still leave a leading "/"."""
+    assert httpx.URL("https://example.com/a/b/../..").path == "/"
+    assert httpx.URL("https://example.com/.").path == "/"
+    assert httpx.URL("https://example.com/..").path == "/"
+    assert httpx.URL("https://example.com/a/../b/..").path == "/"
+    assert httpx.URL("https://example.com/a/b/../c/../d").path == "/a/d"
+
+
 def test_url_escaped_path():
     url = httpx.URL("https://example.com/ /🌟/")
     assert url.raw_path == b"/%20/%F0%9F%8C%9F/"

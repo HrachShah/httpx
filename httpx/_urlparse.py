@@ -472,6 +472,8 @@ def normalize_path(path: str) -> str:
                 output.pop()
         else:
             output.append(component)
+    if output == [""]:
+        return "/"
     return "/".join(output)
 
 
