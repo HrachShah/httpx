@@ -446,6 +446,11 @@ class BaseClient:
         if auth is None:
             return None
         elif isinstance(auth, tuple):
+            if len(auth) != 2:
+                raise TypeError(
+                    f'Invalid "auth" argument: expected a (username, password) tuple, '
+                    f"got tuple of length {len(auth)}"
+                )
             return BasicAuth(username=auth[0], password=auth[1])
         elif isinstance(auth, Auth):
             return auth
