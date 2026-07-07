@@ -87,22 +87,56 @@ class GZipDecoder(ContentDecoder):
     Handle 'gzip' decoding.
 
     See: https://stackoverflow.com/questions/1838699
+
+    A response body may legitimately consist of multiple gzip members
+    concatenated together.  ``zlib.decompressobj`` raises ``eof`` and
+    exposes the bytes of the next member via ``unused_data`` when the
+    current one ends, so we loop on that signal and feed the leftover
+    bytes into a fresh inner decompressor.  The same loop runs in
+    ``flush()`` for callers that only call ``flush()`` at end of stream.
     """
 
     def __init__(self) -> None:
         self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
 
+    def _decompress_all(self, data: bytes) -> bytes:
+        out = io.BytesIO()
+        while True:
+            try:
+                out.write(self.decompressor.decompress(data))
+            except zlib.error as exc:
+                raise DecodingError(str(exc)) from exc
+            if not self.decompressor.eof or not self.decompressor.unused_data:
+                return out.getvalue()
+            data = self.decompressor.unused_data
+            self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+
     def decode(self, data: bytes) -> bytes:
-        try:
-            return self.decompressor.decompress(data)
-        except zlib.error as exc:
-            raise DecodingError(str(exc)) from exc
+        return self._decompress_all(data)
 
     def flush(self) -> bytes:
+        out = io.BytesIO()
         try:
-            return self.decompressor.flush()
+            out.write(self.decompressor.flush())
         except zlib.error as exc:  # pragma: no cover
             raise DecodingError(str(exc)) from exc
+        # An empty body (no decode() calls feeding any bytes) leaves
+        # the inner decompressor at its initial state where flush()
+        # returns b'' with eof=False and unused_data=b''. Treat that
+        # as a complete-but-empty stream, matching the pre-fix
+        # behaviour that GZipDecoder.flush() returned b''.
+        if not self.decompressor.eof and not self.decompressor.unused_data:
+            return out.getvalue()
+        # Otherwise the current member ended cleanly (or the rest of
+        # its bytes were a complete new member); the remaining bytes
+        # (if any) are an additional gzip member that we should also
+        # decode, returning its bytes alongside the trailing output
+        # of the previous member. An actually-truncated stream is
+        # still surfaced by zlib.error on the next decompress call.
+        while self.decompressor.unused_data:
+            self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+            out.write(self._decompress_all(self.decompressor.unused_data))
+        return out.getvalue()
 
 
 class BrotliDecoder(ContentDecoder):
