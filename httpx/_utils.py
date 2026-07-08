@@ -227,16 +227,20 @@ class URLPattern:
 
 
 def is_ipv4_hostname(hostname: str) -> bool:
+    if not isinstance(hostname, str):
+        return False
     try:
         ipaddress.IPv4Address(hostname.split("/")[0])
-    except Exception:
+    except ValueError:
         return False
     return True
 
 
 def is_ipv6_hostname(hostname: str) -> bool:
+    if not isinstance(hostname, str):
+        return False
     try:
         ipaddress.IPv6Address(hostname.split("/")[0])
-    except Exception:
+    except ValueError:
         return False
     return True

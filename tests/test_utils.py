@@ -6,7 +6,12 @@ import random
 import pytest
 
 import httpx
-from httpx._utils import URLPattern, get_environment_proxies
+from httpx._utils import (
+    URLPattern,
+    get_environment_proxies,
+    is_ipv4_hostname,
+    is_ipv6_hostname,
+)
 
 
 @pytest.mark.parametrize(
@@ -148,3 +153,63 @@ def test_pattern_priority():
         URLPattern("http://"),
         URLPattern("all://"),
     ]
+
+
+class TestIsIPv4Hostname:
+    def test_plain_ipv4(self) -> None:
+        assert is_ipv4_hostname("192.168.1.1") is True
+
+    def test_ipv4_with_cidr_suffix(self) -> None:
+        assert is_ipv4_hostname("192.168.0.0/16") is True
+
+    def test_loopback(self) -> None:
+        assert is_ipv4_hostname("127.0.0.1") is True
+
+    def test_ipv6_address_returns_false(self) -> None:
+        # IPv6 strings must not be recognised as IPv4 hostnames.
+        assert is_ipv4_hostname("::1") is False
+        assert is_ipv4_hostname("fe80::1") is False
+
+    def test_hostname_returns_false(self) -> None:
+        assert is_ipv4_hostname("example.com") is False
+        assert is_ipv4_hostname("localhost") is False
+
+    def test_out_of_range_returns_false(self) -> None:
+        # Out-of-range octets raise AddressValueError (a ValueError), not Exception.
+        assert is_ipv4_hostname("256.1.1.1") is False
+        assert is_ipv4_hostname("999.999.999.999") is False
+
+    def test_empty_string_returns_false(self) -> None:
+        assert is_ipv4_hostname("") is False
+
+    def test_non_string_returns_false(self) -> None:
+        # Passing a non-string must not crash; the implementation should
+        # return False rather than swallowing AttributeError etc.
+        assert is_ipv4_hostname(None) is False  # type: ignore[arg-type]
+        assert is_ipv4_hostname(b"192.168.1.1") is False  # type: ignore[arg-type]
+        assert is_ipv4_hostname(12345) is False  # type: ignore[arg-type]
+
+
+class TestIsIPv6Hostname:
+    def test_loopback(self) -> None:
+        assert is_ipv6_hostname("::1") is True
+
+    def test_full_address(self) -> None:
+        assert is_ipv6_hostname("2001:db8::1") is True
+
+    def test_ipv6_with_cidr_suffix(self) -> None:
+        assert is_ipv6_hostname("2001:db8::/32") is True
+
+    def test_ipv4_address_returns_false(self) -> None:
+        assert is_ipv6_hostname("192.168.1.1") is False
+
+    def test_hostname_returns_false(self) -> None:
+        assert is_ipv6_hostname("example.com") is False
+
+    def test_empty_string_returns_false(self) -> None:
+        assert is_ipv6_hostname("") is False
+
+    def test_non_string_returns_false(self) -> None:
+        assert is_ipv6_hostname(None) is False  # type: ignore[arg-type]
+        assert is_ipv6_hostname(b"::1") is False  # type: ignore[arg-type]
+        assert is_ipv6_hostname(12345) is False  # type: ignore[arg-type]
