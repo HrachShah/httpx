@@ -91,18 +91,35 @@ class GZipDecoder(ContentDecoder):
 
     def __init__(self) -> None:
         self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+        self.seen_data = False
 
     def decode(self, data: bytes) -> bytes:
+        if not data:
+            return b""
+        self.seen_data = True
+        output = io.BytesIO()
         try:
-            return self.decompressor.decompress(data)
+            output.write(self.decompressor.decompress(data))
+            while self.decompressor.eof and self.decompressor.unused_data:
+                unused_data = self.decompressor.unused_data
+                self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+                output.write(self.decompressor.decompress(unused_data))
         except zlib.error as exc:
             raise DecodingError(str(exc)) from exc
+        return output.getvalue()
 
     def flush(self) -> bytes:
+        if not self.seen_data:
+            return b""
         try:
-            return self.decompressor.flush()
+            ret = self.decompressor.flush()
+            while self.decompressor.eof and self.decompressor.unused_data:
+                unused_data = self.decompressor.unused_data
+                self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
+                ret += self.decompressor.decompress(unused_data) + self.decompressor.flush()
         except zlib.error as exc:  # pragma: no cover
             raise DecodingError(str(exc)) from exc
+        return bytes(ret)
 
 
 class BrotliDecoder(ContentDecoder):

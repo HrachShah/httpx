@@ -62,6 +62,32 @@ def test_gzip():
     assert response.content == body
 
 
+def test_gzip_concatenated_members():
+    chunk1 = b"first chunk"
+    chunk2 = b"second chunk"
+    chunk3 = b"third chunk"
+    def gzip_compress(data):
+        c = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+        return c.compress(data) + c.flush()
+    compressed = gzip_compress(chunk1) + gzip_compress(chunk2) + gzip_compress(chunk3)
+    headers = [(b"Content-Encoding", b"gzip")]
+    response = httpx.Response(200, headers=headers, content=compressed)
+    assert response.content == chunk1 + chunk2 + chunk3
+
+
+def test_gzip_concatenated_members_split_chunks():
+    chunk1 = b"alpha beta gamma"
+    chunk2 = b"delta epsilon zeta"
+    def gzip_compress(data):
+        c = zlib.compressobj(9, zlib.DEFLATED, zlib.MAX_WBITS | 16)
+        return c.compress(data) + c.flush()
+    compressed = gzip_compress(chunk1) + gzip_compress(chunk2)
+    split = len(compressed) // 2 + 7
+    headers = [(b"Content-Encoding", b"gzip")]
+    response = httpx.Response(200, headers=headers, content=[compressed[:split], compressed[split:]])
+    assert response.read() == chunk1 + chunk2
+
+
 def test_brotli():
     body = b"test 123"
     compressed_body = b"\x8b\x03\x80test 123\x03"
