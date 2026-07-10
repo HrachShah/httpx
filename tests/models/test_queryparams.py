@@ -134,3 +134,31 @@ def test_queryparams_are_hashable():
     )
 
     assert len(set(params)) == 2
+
+
+def test_queryparams_rejects_too_many_positional_args():
+    """QueryParams() used to `assert len(args) < 2, "Too many arguments."`.
+
+    Under `python -O` the assert is stripped and the second positional
+    argument silently drove the rest of the constructor with whatever
+    `parse_qs` would make of it (e.g. for `QueryParams("a=1", "b=2")` the
+    second arg is a stray string that gets parsed as query text and
+    produces confusing results). Raise a clear TypeError instead.
+    """
+    with pytest.raises(TypeError, match="Too many positional arguments"):
+        httpx.QueryParams("a=1", "b=2")
+    with pytest.raises(TypeError, match="Too many positional arguments"):
+        httpx.QueryParams({"a": "1"}, {"b": "2"})
+
+
+def test_queryparams_rejects_mixed_positional_and_keyword():
+    """QueryParams() used to `assert not (args and kwargs), "Cannot mix named
+    and unnamed arguments."`. Under `python -O` that assert is stripped
+    and a call like `QueryParams("a=1", b="2")` would silently use only
+    the positional argument and drop the keyword. Raise a clear TypeError
+    instead.
+    """
+    with pytest.raises(TypeError, match="Cannot mix positional and keyword"):
+        httpx.QueryParams("a=1", b="2")
+    with pytest.raises(TypeError, match="Cannot mix positional and keyword"):
+        httpx.QueryParams({"a": "1"}, b="2")

@@ -423,8 +423,15 @@ class QueryParams(typing.Mapping[str, str]):
     """
 
     def __init__(self, *args: QueryParamTypes | None, **kwargs: typing.Any) -> None:
-        assert len(args) < 2, "Too many arguments."
-        assert not (args and kwargs), "Cannot mix named and unnamed arguments."
+        if len(args) > 1:
+            raise TypeError(
+                f"Too many positional arguments. QueryParams accepts "
+                f"at most one positional argument, got {len(args)}."
+            )
+        if args and kwargs:
+            raise TypeError(
+                "Cannot mix positional and keyword arguments in QueryParams()."
+            )
 
         value = args[0] if args else kwargs
 
