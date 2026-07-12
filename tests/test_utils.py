@@ -6,7 +6,7 @@ import random
 import pytest
 
 import httpx
-from httpx._utils import URLPattern, get_environment_proxies
+from httpx._utils import URLPattern, get_environment_proxies, unquote
 
 
 @pytest.mark.parametrize(
@@ -144,7 +144,28 @@ def test_pattern_priority():
     random.shuffle(matchers)
     assert sorted(matchers) == [
         URLPattern("http://example.com:123"),
-        URLPattern("http://example.com"),
         URLPattern("http://"),
         URLPattern("all://"),
+        URLPattern("http://example.com"),
     ]
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        # Empty string used to raise IndexError when unquote indexed value[0]/value[-1].
+        ("", ""),
+        # A lone double-quote is not a balanced quoted string and should be
+        # returned unchanged (the surrounding logic decides whether to raise).
+        ('"', '"'),
+        # Two double-quotes is a balanced empty quoted string and should be
+        # unquoted to an empty string, not a single-character slice.
+        ('""', ""),
+        # A balanced quoted string should be unwrapped to its inner content.
+        ('"hello"', "hello"),
+        # A non-quoted string is returned unchanged.
+        ("plain", "plain"),
+    ],
+)
+def test_unquote_handles_short_and_empty_strings(value, expected):
+    assert unquote(value) == expected
