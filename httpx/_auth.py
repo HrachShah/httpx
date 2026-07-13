@@ -236,7 +236,11 @@ class DigestAuth(Auth):
 
         header_dict: dict[str, str] = {}
         for field in parse_http_list(fields):
-            key, value = field.strip().split("=", 1)
+            try:
+                key, value = field.strip().split("=", 1)
+            except ValueError as exc:
+                message = "Malformed Digest WWW-Authenticate header"
+                raise ProtocolError(message, request=request) from exc
             header_dict[key] = unquote(value)
 
         try:

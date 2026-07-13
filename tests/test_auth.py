@@ -306,3 +306,35 @@ def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     response = httpx.Response(content=b"Hello, world!", status_code=200)
     with pytest.raises(StopIteration):
         flow.send(response)
+
+
+def test_digest_auth_with_401_malformed_challenge_raises_protocolerror():
+    """
+    A 401 response with a WWW-Authenticate header that contains a Digest
+    challenge with a field missing an '=' (so the field cannot be split into
+    key/value) should raise `httpx.ProtocolError` ("Malformed Digest
+    WWW-Authenticate header") with the request attached, not leak a bare
+    `ValueError: not enough values to unpack` from the unpack step.
+    """
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+
+    flow = auth.sync_auth_flow(request)
+    request = next(flow)
+
+    # `broken_item` has no '=' so `field.strip().split("=", 1)` returns a
+    # one-element list, which previously raised a bare `ValueError`.
+    headers = {
+        "WWW-Authenticate": 'Digest realm="...", qop="auth", broken_item, nonce="..."'
+    }
+    response = httpx.Response(
+        content=b"Auth required",
+        status_code=401,
+        headers=headers,
+        request=request,
+    )
+
+    with pytest.raises(httpx.ProtocolError) as excinfo:
+        flow.send(response)
+    assert str(excinfo.value) == "Malformed Digest WWW-Authenticate header"
+    assert excinfo.value.request is request
