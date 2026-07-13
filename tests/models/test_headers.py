@@ -87,6 +87,21 @@ def test_headers_delete_removes_all_existing():
     assert dict(headers) == {}
 
 
+def test_headers_contains_returns_false_for_non_string_keys():
+    # dict returns False for non-string keys. Headers
+    # should match: any non-string key that is not also a byte string is
+    # definitely not a header, so the membership check should be False
+    # rather than leaking an AttributeError from str.lower().
+    headers = httpx.Headers([("a", "123")])
+    assert 42 not in headers
+    assert None not in headers
+    assert 1.5 not in headers
+    assert (42,) not in headers
+    # Sanity: a str-typed byte-like value still works.
+    assert "a" in headers
+    assert "missing" not in headers
+
+
 def test_headers_dict_repr():
     """
     Headers should display with a dict repr by default.
