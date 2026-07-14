@@ -26,6 +26,33 @@ def test_basic_auth():
         flow.send(response)
 
 
+def test_digest_auth_malformed_challenge_field_raises_protocol_error():
+    """A WWW-Authenticate challenge with a bare token (no '=' separator)
+    is malformed per RFC 7616 §3.3.  The auth flow must surface a clean
+    ``ProtocolError`` instead of the raw ``ValueError: not enough values
+    to unpack`` that ``str.split('=', 1)`` would raise."""
+    from httpx import ProtocolError
+
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com/")
+
+    flow = auth.sync_auth_flow(request)
+    request = next(flow)
+    # A bare token (the empty string between two commas) breaks the
+    # 'key=value' assumption in the parser.
+    headers = {
+        "WWW-Authenticate": 'Digest realm="x", , nonce="abc"',
+    }
+    response = httpx.Response(
+        content=b"Auth required",
+        status_code=401,
+        headers=headers,
+        request=request,
+    )
+    with pytest.raises(ProtocolError, match="Malformed Digest WWW-Authenticate header"):
+        flow.send(response)
+
+
 def test_digest_auth_with_200():
     auth = httpx.DigestAuth(username="user", password="pass")
     request = httpx.Request("GET", "https://www.example.com")

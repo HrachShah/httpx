@@ -234,10 +234,19 @@ class DigestAuth(Auth):
         # This method should only ever have been called with a Digest auth header.
         assert scheme.lower() == "digest"
 
+        # Parse the comma-separated auth-param list (RFC 7616 §3.3).  A bare
+        # token without an '=' separator is malformed per the spec; previously
+        # the unpacking fell through with a raw `ValueError: not enough values
+        # to unpack` and bypassed the ProtocolError path.  Treat both
+        # malformed fields and missing required params as one and the same.
         header_dict: dict[str, str] = {}
-        for field in parse_http_list(fields):
-            key, value = field.strip().split("=", 1)
-            header_dict[key] = unquote(value)
+        try:
+            for field in parse_http_list(fields):
+                key, value = field.strip().split("=", 1)
+                header_dict[key] = unquote(value)
+        except ValueError as exc:
+            message = "Malformed Digest WWW-Authenticate header"
+            raise ProtocolError(message, request=request) from exc
 
         try:
             realm = header_dict["realm"].encode()
