@@ -76,6 +76,37 @@ def test_queryparam_types():
     assert str(q) == "a=1&a=2"
 
 
+@pytest.mark.parametrize(
+    "bad_items",
+    [
+        [1, 2, 3],
+        ["only_key"],
+        [("only_key",)],
+        [("k", "v", "extra")],
+        [42],
+        [b"bytes"],
+        [True],
+        [None],
+        [{"k": "v"}],
+        [[1]],
+    ],
+)
+def test_queryparams_rejects_malformed_list_items(bad_items):
+    with pytest.raises(TypeError, match=r"QueryParams list/tuple items must be 2-element pairs .key, value."):
+        httpx.QueryParams(bad_items)
+
+
+def test_queryparams_malformed_list_item_error_includes_index_and_type():
+    with pytest.raises(TypeError) as exc_info:
+        httpx.QueryParams([("a", "b"), 42, ("c", "d")])
+    msg = str(exc_info.value)
+    # The message identifies the offending index and the offending type, so a
+    # caller can fix the call site without reading httpx source.
+    assert "index 1" in msg
+    assert "int" in msg
+    assert "42" in msg
+
+
 def test_empty_query_params():
     q = httpx.QueryParams({"a": ""})
     assert str(q) == "a="
