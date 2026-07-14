@@ -239,7 +239,17 @@ def urlparse(url: str = "", **kwargs: str | None) -> ParseResult:
     # Replace "netloc" with "host and "port".
     if "netloc" in kwargs:
         netloc = kwargs.pop("netloc") or ""
-        kwargs["host"], _, kwargs["port"] = netloc.partition(":")
+        if netloc.startswith("["):
+            end = netloc.find("]")
+            if end == -1:
+                raise InvalidURL("Invalid IPv6 address in netloc")
+            kwargs["host"] = netloc[: end + 1]
+            remainder = netloc[end + 1 :]
+            if remainder and not remainder.startswith(":"):
+                raise InvalidURL("Invalid netloc")
+            kwargs["port"] = remainder[1:]
+        else:
+            kwargs["host"], _, kwargs["port"] = netloc.partition(":")
 
     # Replace "username" and/or "password" with "userinfo".
     if "username" in kwargs or "password" in kwargs:
@@ -484,6 +494,10 @@ def normalize_path(path: str) -> str:
                 output.pop()
         else:
             output.append(component)
+    if not output:
+        return ""
+    if output == [""]:
+        return "/"
     return "/".join(output)
 
 
