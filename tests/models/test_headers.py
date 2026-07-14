@@ -87,6 +87,18 @@ def test_headers_delete_removes_all_existing():
     assert dict(headers) == {}
 
 
+def test_headers_contains_returns_false_for_bytes_key():
+    # dict returns False for non-str keys, so bytes lookup should
+    # follow the same contract. Previously `b'content-type' in headers`
+    # raised `AttributeError: 'bytes' object has no attribute 'encode'`
+    # from the key.lower().encode() call.
+    headers = httpx.Headers({"Content-Type": "application/json"})
+    assert (b"content-type" in headers) is False
+    assert (b"x-missing" in headers) is False
+    # str lookup still works.
+    assert ("content-type" in headers) is True
+
+
 def test_headers_dict_repr():
     """
     Headers should display with a dict repr by default.

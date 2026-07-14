@@ -344,6 +344,13 @@ class Headers(typing.MutableMapping[str, str]):
             del self._list[idx]
 
     def __contains__(self, key: typing.Any) -> bool:
+        # `key` may not be a string in user code (e.g. `42 in headers` after
+        # computing an integer id, or a `bytes` value from a header parser).
+        # `dict.__contains__` returns `False` for non-string keys here, so
+        # mirror that instead of leaking an `AttributeError` from `key.lower()`
+        # on int/None/tuple, or from `.encode(self.encoding)` on `bytes`.
+        if not isinstance(key, str):
+            return False
         header_key = key.lower().encode(self.encoding)
         return header_key in [key for _, key, _ in self._list]
 
