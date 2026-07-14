@@ -440,8 +440,17 @@ class QueryParams(typing.Mapping[str, str]):
                 #     [("a", "123"), ("a", "456"), ("b", "789")]
                 # To a dict representation, like:
                 #     {"a": ["123", "456"], "b": ["789"]}
-                for item in value:
-                    dict_value.setdefault(item[0], []).append(item[1])
+                dict_value = {}
+                for index, item in enumerate(value):
+                    if not isinstance(item, (list, tuple)) or len(item) != 2:
+                        msg = (
+                            f"QueryParams list/tuple items must be 2-element pairs "
+                            f"(key, value); got item at index {index}: "
+                            f"{type(item).__name__}: {item!r}"
+                        )
+                        raise TypeError(msg)
+                    key, item_value = item
+                    dict_value.setdefault(key, []).append(item_value)
             else:
                 # Convert dict inputs like:
                 #    {"a": "123", "b": ["456", "789"]}
