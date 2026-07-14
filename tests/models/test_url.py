@@ -637,6 +637,14 @@ def test_url_copywith_authority_subcomponents():
     assert str(new) == "https://username:password@example.net:444"
 
 
+def test_url_copywith_ipv6_netloc():
+    url = httpx.URL("https://example.org")
+    new = url.copy_with(netloc=b"[::1]:8080")
+    assert str(new) == "https://[::1]:8080"
+    assert new.host == "::1"
+    assert new.port == 8080
+
+
 def test_url_copywith_netloc():
     copy_with_kwargs = {
         "netloc": b"example.net:444",
