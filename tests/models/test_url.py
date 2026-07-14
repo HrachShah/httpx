@@ -904,3 +904,45 @@ def test_ipv6_url_copy_with_host(url_str, new_host):
     assert url.host == "::ffff:192.168.0.1"
     assert url.netloc == b"[::ffff:192.168.0.1]:1234"
     assert str(url) == "http://[::ffff:192.168.0.1]:1234"
+
+
+@pytest.mark.parametrize(
+    "url_str, expected",
+    [
+        # An absolute path that resolves to the root after removing dot
+        # segments must keep its leading '/'. Previously these produced
+        # `http://example.com` (no path at all), which differs from the
+        # WHATWG URL spec and round-trips badly when re-joined.
+        ("http://example.com/foo/../../..", "http://example.com/"),
+        ("http://example.com/foo/../..", "http://example.com/"),
+        ("http://example.com/..", "http://example.com/"),
+        ("http://example.com/.", "http://example.com/"),
+        # Already-normalised cases must be unaffected.
+        ("http://example.com/", "http://example.com/"),
+        ("http://example.com/foo/bar", "http://example.com/foo/bar"),
+        ("http://example.com/../foo", "http://example.com/foo"),
+        ("http://example.com/foo/../../bar", "http://example.com/bar"),
+        # Pathless URLs should remain pathless.
+        ("http://example.com", "http://example.com"),
+    ],
+)
+def test_url_dot_segments_resolving_to_root_keep_leading_slash(
+    url_str, expected
+):
+    # Regression test: before the fix, `httpx.URL("http://example.com/..")`
+    # produced a URL whose string form dropped the trailing slash
+    # (`http://example.com`). The fix preserves the leading '/' whenever
+    # the input path was absolute.
+    assert str(httpx.URL(url_str)) == expected
+
+
+def test_url_dot_segments_rejoin_from_root_url():
+    # Once a URL is normalised, joining a relative reference must use the
+    # normalised absolute path (i.e. "/"), not an empty string. Before the
+    # fix the underlying URI ref had path="" for cases like /.., and
+    # although the URL's string form displayed "/", the join behaviour
+    # was inconsistent with the displayed path.
+    base = httpx.URL("http://example.com/foo/../..")
+    assert str(base) == "http://example.com/"
+    joined = base.join("bar")
+    assert str(joined) == "http://example.com/bar"
