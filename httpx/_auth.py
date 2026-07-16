@@ -255,7 +255,11 @@ class DigestAuth(Auth):
     def _build_auth_header(
         self, request: Request, challenge: _DigestAuthChallenge
     ) -> str:
-        hash_func = self._ALGORITHM_TO_HASH_FUNCTION[challenge.algorithm.upper()]
+        try:
+            hash_func = self._ALGORITHM_TO_HASH_FUNCTION[challenge.algorithm.upper()]
+        except KeyError as exc:
+            message = f'Unsupported digest algorithm "{challenge.algorithm}"'
+            raise ProtocolError(message, request=request) from exc
 
         def digest(data: bytes) -> bytes:
             return hash_func(data).hexdigest().encode()

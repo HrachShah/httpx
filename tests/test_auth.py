@@ -248,6 +248,26 @@ def test_digest_auth_rfc_7616_md5(monkeypatch):
         flow.send(response)
 
 
+def test_digest_auth_unsupported_algorithm():
+    auth = httpx.DigestAuth(username="Mufasa", password="Circle of Life")
+    request = httpx.Request("GET", "https://www.example.com/dir/index.html")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest realm="http-auth@example.org", '
+                'nonce="abc", algorithm=SHA-999'
+            )
+        },
+        request=request,
+    )
+    with pytest.raises(httpx.ProtocolError, match='Unsupported digest algorithm "SHA-999"'):
+        flow.send(response)
+
+
 def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     # Example from https://datatracker.ietf.org/doc/html/rfc7616#section-3.9.1
 
