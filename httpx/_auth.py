@@ -333,7 +333,7 @@ class DigestAuth(Auth):
     def _resolve_qop(self, qop: bytes | None, request: Request) -> bytes | None:
         if qop is None:
             return None
-        qops = re.split(b", ?", qop)
+        qops = [part.strip() for part in qop.split(b",")]
         if b"auth" in qops:
             return b"auth"
 

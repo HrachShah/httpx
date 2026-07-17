@@ -268,6 +268,25 @@ def test_digest_auth_unsupported_algorithm():
         flow.send(response)
 
 
+def test_digest_auth_accepts_whitespace_around_qop_values():
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest realm="realm", nonce="nonce", qop="auth,  auth-int"'
+            )
+        },
+        request=request,
+    )
+    authenticated_request = flow.send(response)
+    assert "qop=auth" in authenticated_request.headers["Authorization"]
+
+
 def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     # Example from https://datatracker.ietf.org/doc/html/rfc7616#section-3.9.1
 
