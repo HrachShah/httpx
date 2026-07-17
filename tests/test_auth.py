@@ -268,6 +268,27 @@ def test_digest_auth_unsupported_algorithm():
         flow.send(response)
 
 
+@pytest.mark.parametrize(
+    "challenge",
+    [
+        'Digest realm="realm", nonce="nonce", qop',
+        'Digest realm="realm", nonce="nonce", ="value"',
+    ],
+)
+def test_digest_auth_malformed_field_is_protocol_error(challenge):
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+    response = httpx.Response(
+        status_code=401,
+        headers={"WWW-Authenticate": challenge},
+        request=request,
+    )
+    with pytest.raises(httpx.ProtocolError, match="Malformed Digest"):
+        flow.send(response)
+
+
 def test_digest_auth_accepts_whitespace_around_qop_values():
     auth = httpx.DigestAuth(username="user", password="pass")
     request = httpx.Request("GET", "https://www.example.com")

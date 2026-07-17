@@ -235,9 +235,15 @@ class DigestAuth(Auth):
         assert scheme.lower() == "digest"
 
         header_dict: dict[str, str] = {}
-        for field in parse_http_list(fields):
-            key, value = field.strip().split("=", 1)
-            header_dict[key] = unquote(value)
+        try:
+            for field in parse_http_list(fields):
+                key, value = field.strip().split("=", 1)
+                if not key:
+                    raise ValueError("empty field name")
+                header_dict[key] = unquote(value)
+        except ValueError as exc:
+            message = "Malformed Digest WWW-Authenticate header"
+            raise ProtocolError(message, request=request) from exc
 
         try:
             realm = header_dict["realm"].encode()
