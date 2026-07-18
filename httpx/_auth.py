@@ -332,7 +332,10 @@ class DigestAuth(Auth):
                 if field not in NON_QUOTED_FIELDS
                 else NON_QUOTED_TEMPLATE
             )
-            header_value += template.format(field, to_str(value))
+            rendered_value = to_str(value)
+            if field not in NON_QUOTED_FIELDS:
+                rendered_value = rendered_value.replace("\\", "\\\\").replace('"', '\\"')
+            header_value += template.format(field, rendered_value)
 
         return header_value
 

@@ -366,3 +366,22 @@ def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     response = httpx.Response(content=b"Hello, world!", status_code=200)
     with pytest.raises(StopIteration):
         flow.send(response)
+
+
+def test_digest_auth_escapes_quoted_header_values(monkeypatch):
+    auth = httpx.DigestAuth(username='user"name', password="pass")
+    monkeypatch.setattr(auth, "_get_client_nonce", lambda nonce_count, nonce: b"nonce")
+    request = httpx.Request("GET", "https://www.example.com/")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": 'Digest realm="realm\\\"name", nonce="nonce"'
+        },
+        request=request,
+    )
+    authenticated = flow.send(response)
+    authorization = authenticated.headers["Authorization"]
+    assert 'username="user\\\"name"' in authorization
+    assert 'realm="realm\\\"name"' in authorization
