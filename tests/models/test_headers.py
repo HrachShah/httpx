@@ -10,6 +10,8 @@ def test_headers():
     assert "b" in h
     assert "B" in h
     assert "c" not in h
+    assert 1 not in h
+    assert b"a" not in h
     assert h["a"] == "123, 456"
     assert h.get("a") == "123, 456"
     assert h.get("nope", default=None) is None

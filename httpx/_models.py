@@ -344,6 +344,8 @@ class Headers(typing.MutableMapping[str, str]):
             del self._list[idx]
 
     def __contains__(self, key: typing.Any) -> bool:
+        if not isinstance(key, str):
+            return False
         header_key = key.lower().encode(self.encoding)
         return header_key in [key for _, key, _ in self._list]
 
