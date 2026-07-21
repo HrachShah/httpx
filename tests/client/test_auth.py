@@ -410,6 +410,20 @@ async def test_digest_auth_401_response_without_digest_auth_header() -> None:
     assert len(response.history) == 0
 
 
+@pytest.mark.anyio
+async def test_digest_auth_normalizes_algorithm_name_in_header() -> None:
+    url = "https://example.org/"
+    auth = httpx.DigestAuth(username="user", password="password123")
+    app = DigestApp(algorithm="sha-256")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(app)) as client:
+        response = await client.get(url, auth=auth)
+
+    assert response.status_code == 200
+    authorization = typing.cast(typing.Dict[str, typing.Any], response.json())["auth"]
+    assert 'algorithm=SHA-256' in authorization
+
+
 @pytest.mark.parametrize(
     "algorithm,expected_hash_length,expected_response_length",
     [
