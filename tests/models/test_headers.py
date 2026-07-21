@@ -219,3 +219,12 @@ def test_parse_header_links(value, expected):
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
+
+
+def test_parse_header_links_keeps_later_parameters_after_malformed_entry():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; rel="next"; flag; title=hi=there'},
+    )
+
+    assert response.links["next"]["title"] == "hi=there"
