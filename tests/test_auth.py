@@ -66,6 +66,27 @@ def test_digest_auth_with_401():
         flow.send(response)
 
 
+def test_digest_auth_accepts_case_insensitive_challenge_fields():
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        content=b"Auth required",
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest REALM="...", QOP="auth", NONCE="...", OPAQUE="..."'
+            )
+        },
+        request=request,
+    )
+
+    authenticated_request = flow.send(response)
+    assert authenticated_request.headers["Authorization"].startswith("Digest")
+
+
 def test_digest_auth_with_401_nonce_counting():
     auth = httpx.DigestAuth(username="user", password="pass")
     request = httpx.Request("GET", "https://www.example.com")
@@ -248,6 +269,66 @@ def test_digest_auth_rfc_7616_md5(monkeypatch):
         flow.send(response)
 
 
+def test_digest_auth_unsupported_algorithm():
+    auth = httpx.DigestAuth(username="Mufasa", password="Circle of Life")
+    request = httpx.Request("GET", "https://www.example.com/dir/index.html")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest realm="http-auth@example.org", '
+                'nonce="abc", algorithm=SHA-999'
+            )
+        },
+        request=request,
+    )
+    with pytest.raises(httpx.ProtocolError, match='Unsupported digest algorithm "SHA-999"'):
+        flow.send(response)
+
+
+@pytest.mark.parametrize(
+    "challenge",
+    [
+        'Digest realm="realm", nonce="nonce", qop',
+        'Digest realm="realm", nonce="nonce", ="value"',
+    ],
+)
+def test_digest_auth_malformed_field_is_protocol_error(challenge):
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+    response = httpx.Response(
+        status_code=401,
+        headers={"WWW-Authenticate": challenge},
+        request=request,
+    )
+    with pytest.raises(httpx.ProtocolError, match="Malformed Digest"):
+        flow.send(response)
+
+
+def test_digest_auth_accepts_whitespace_around_qop_values():
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest realm="realm", nonce="nonce", qop="auth,  auth-int"'
+            )
+        },
+        request=request,
+    )
+    authenticated_request = flow.send(response)
+    assert "qop=auth" in authenticated_request.headers["Authorization"]
+
+
 def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     # Example from https://datatracker.ietf.org/doc/html/rfc7616#section-3.9.1
 
@@ -306,3 +387,22 @@ def test_digest_auth_rfc_7616_sha_256(monkeypatch):
     response = httpx.Response(content=b"Hello, world!", status_code=200)
     with pytest.raises(StopIteration):
         flow.send(response)
+
+
+def test_digest_auth_escapes_quoted_header_values(monkeypatch):
+    auth = httpx.DigestAuth(username='user"name', password="pass")
+    monkeypatch.setattr(auth, "_get_client_nonce", lambda nonce_count, nonce: b"nonce")
+    request = httpx.Request("GET", "https://www.example.com/")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+    response = httpx.Response(
+        status_code=401,
+        headers={
+            "WWW-Authenticate": 'Digest realm="realm\\\"name", nonce="nonce"'
+        },
+        request=request,
+    )
+    authenticated = flow.send(response)
+    authorization = authenticated.headers["Authorization"]
+    assert 'username="user\\\"name"' in authorization
+    assert 'realm="realm\\\"name"' in authorization

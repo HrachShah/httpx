@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 * Expose `FunctionAuth`
+* Preserve the leading `/` in `normalize_path` for absolute paths whose dot-segments resolve to root. URLs like `http://example.com/foo/../..` previously stringified as `http://example.com` (no path at all) and lost their root, instead of the WHATWG-compliant `http://example.com/`.
 
 ## 0.28.1 (6th December, 2024)
 

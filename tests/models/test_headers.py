@@ -10,6 +10,8 @@ def test_headers():
     assert "b" in h
     assert "B" in h
     assert "c" not in h
+    assert 1 not in h
+    assert b"a" not in h
     assert h["a"] == "123, 456"
     assert h.get("a") == "123, 456"
     assert h.get("nope", default=None) is None
@@ -217,3 +219,12 @@ def test_parse_header_links(value, expected):
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
+
+
+def test_parse_header_links_keeps_later_parameters_after_malformed_entry():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; rel="next"; flag; title=hi=there'},
+    )
+
+    assert response.links["next"]["title"] == "hi=there"

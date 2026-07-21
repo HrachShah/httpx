@@ -235,9 +235,16 @@ class DigestAuth(Auth):
         assert scheme.lower() == "digest"
 
         header_dict: dict[str, str] = {}
-        for field in parse_http_list(fields):
-            key, value = field.strip().split("=", 1)
-            header_dict[key] = unquote(value)
+        try:
+            for field in parse_http_list(fields):
+                key, value = field.strip().split("=", 1)
+                key = key.strip().lower()
+                if not key:
+                    raise ValueError("empty field name")
+                header_dict[key] = unquote(value)
+        except ValueError as exc:
+            message = "Malformed Digest WWW-Authenticate header"
+            raise ProtocolError(message, request=request) from exc
 
         try:
             realm = header_dict["realm"].encode()
@@ -255,7 +262,11 @@ class DigestAuth(Auth):
     def _build_auth_header(
         self, request: Request, challenge: _DigestAuthChallenge
     ) -> str:
-        hash_func = self._ALGORITHM_TO_HASH_FUNCTION[challenge.algorithm.upper()]
+        try:
+            hash_func = self._ALGORITHM_TO_HASH_FUNCTION[challenge.algorithm.upper()]
+        except KeyError as exc:
+            message = f'Unsupported digest algorithm "{challenge.algorithm}"'
+            raise ProtocolError(message, request=request) from exc
 
         def digest(data: bytes) -> bytes:
             return hash_func(data).hexdigest().encode()
@@ -322,14 +333,17 @@ class DigestAuth(Auth):
                 if field not in NON_QUOTED_FIELDS
                 else NON_QUOTED_TEMPLATE
             )
-            header_value += template.format(field, to_str(value))
+            rendered_value = to_str(value)
+            if field not in NON_QUOTED_FIELDS:
+                rendered_value = rendered_value.replace("\\", "\\\\").replace('"', '\\"')
+            header_value += template.format(field, rendered_value)
 
         return header_value
 
     def _resolve_qop(self, qop: bytes | None, request: Request) -> bytes | None:
         if qop is None:
             return None
-        qops = re.split(b", ?", qop)
+        qops = [part.strip() for part in qop.split(b",")]
         if b"auth" in qops:
             return b"auth"
 

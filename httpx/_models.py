@@ -119,9 +119,9 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
         link = {"url": url.strip("<> '\"")}
         for param in params.split(";"):
             try:
-                key, value = param.split("=")
+                key, value = param.split("=", 1)
             except ValueError:
-                break
+                continue
             link[key.strip(replace_chars)] = value.strip(replace_chars)
         links.append(link)
     return links
@@ -344,6 +344,8 @@ class Headers(typing.MutableMapping[str, str]):
             del self._list[idx]
 
     def __contains__(self, key: typing.Any) -> bool:
+        if not isinstance(key, str):
+            return False
         header_key = key.lower().encode(self.encoding)
         return header_key in [key for _, key, _ in self._list]
 
