@@ -66,6 +66,27 @@ def test_digest_auth_with_401():
         flow.send(response)
 
 
+def test_digest_auth_accepts_case_insensitive_challenge_fields():
+    auth = httpx.DigestAuth(username="user", password="pass")
+    request = httpx.Request("GET", "https://www.example.com")
+    flow = auth.sync_auth_flow(request)
+    next(flow)
+
+    response = httpx.Response(
+        content=b"Auth required",
+        status_code=401,
+        headers={
+            "WWW-Authenticate": (
+                'Digest REALM="...", QOP="auth", NONCE="...", OPAQUE="..."'
+            )
+        },
+        request=request,
+    )
+
+    authenticated_request = flow.send(response)
+    assert authenticated_request.headers["Authorization"].startswith("Digest")
+
+
 def test_digest_auth_with_401_nonce_counting():
     auth = httpx.DigestAuth(username="user", password="pass")
     request = httpx.Request("GET", "https://www.example.com")

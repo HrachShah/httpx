@@ -238,6 +238,7 @@ class DigestAuth(Auth):
         try:
             for field in parse_http_list(fields):
                 key, value = field.strip().split("=", 1)
+                key = key.strip().lower()
                 if not key:
                     raise ValueError("empty field name")
                 header_dict[key] = unquote(value)
