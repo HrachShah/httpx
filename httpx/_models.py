@@ -90,6 +90,27 @@ def _parse_content_type_charset(content_type: str) -> str | None:
     return msg.get_content_charset(failobj=None)
 
 
+def _split_header_params(value: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    quoted = False
+    escaped = False
+
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+        elif char == "\\" and quoted:
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif char == ";" and not quoted:
+            parts.append(value[start:index])
+            start = index + 1
+
+    parts.append(value[start:])
+    return parts
+
+
 def _parse_header_links(value: str) -> list[dict[str, str]]:
     """
     Returns a list of parsed link headers, for more info see:
@@ -117,7 +138,7 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
         except ValueError:
             url, params = val, ""
         link = {"url": url.strip("<> '\"")}
-        for param in params.split(";"):
+        for param in _split_header_params(params):
             try:
                 key, value = param.split("=", 1)
             except ValueError:

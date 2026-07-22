@@ -216,6 +216,15 @@ def test_parse_header_links(value, expected):
     assert all(link in all_links for link in expected)
 
 
+def test_parse_header_links_preserves_semicolons_in_quoted_values():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; title="part one; part two"'},
+    )
+
+    assert response.links["/page"]["title"] == "part one; part two"
+
+
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
