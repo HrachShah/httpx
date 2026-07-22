@@ -132,18 +132,22 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
     value = value.strip(replace_chars)
     if not value:
         return links
-    for val in re.split(", *<", value):
-        try:
-            url, params = val.split(";", 1)
-        except ValueError:
-            url, params = val, ""
-        link = {"url": url.strip("<> '\"")}
+    for url_match in re.finditer(r"<([^>]*)>", value):
+        url = url_match.group(1).strip().strip(replace_chars)
+        if not url:
+            continue
+        tail = value[url_match.end():]
+        next_url = tail.find("<")
+        params = tail if next_url == -1 else tail[:next_url]
+        params = params.rstrip(" ,")
+        link = {"url": url}
         for param in _split_header_params(params):
-            try:
-                key, value = param.split("=", 1)
-            except ValueError:
+            if "=" not in param:
                 continue
-            link[key.strip(replace_chars)] = value.strip(replace_chars)
+            key, value = param.split("=", 1)
+            key = key.strip(replace_chars)
+            if key:
+                link[key] = value.strip(replace_chars)
         links.append(link)
     return links
 

@@ -237,3 +237,15 @@ def test_parse_header_links_keeps_later_parameters_after_malformed_entry():
     )
 
     assert response.links["next"]["title"] == "hi=there"
+
+
+def test_parse_header_links_ignores_blank_segments():
+    response = httpx.Response(
+        200,
+        headers={"link": "<http:/.../a>,, <http:/.../b>; rel=next,"},
+    )
+
+    assert list(response.links.values()) == [
+        {"url": "http:/.../a"},
+        {"url": "http:/.../b", "rel": "next"},
+    ]
