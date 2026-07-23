@@ -306,6 +306,10 @@ class Headers(typing.MutableMapping[str, str]):
         Set the header `key` to `value`, removing any duplicate entries.
         Retains insertion order.
         """
+        if not isinstance(key, str):
+            raise TypeError(f"Header name must be str, not {type(key).__name__}")
+        if not isinstance(value, str):
+            raise TypeError(f"Header value must be str, not {type(value).__name__}")
         set_key = key.encode(self._encoding or "utf-8")
         set_value = value.encode(self._encoding or "utf-8")
         lookup_key = set_key.lower()
