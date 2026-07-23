@@ -34,6 +34,15 @@ def test_headers():
     assert repr(h) == "Headers({'a': '123', 'b': '789'})"
 
 
+def test_headers_reject_non_string_mutation_values():
+    headers = httpx.Headers()
+
+    with pytest.raises(TypeError, match="Header name must be str"):
+        headers[1] = "value"
+    with pytest.raises(TypeError, match="Header value must be str"):
+        headers["name"] = 1
+
+
 def test_header_mutations():
     h = httpx.Headers()
     assert dict(h) == {}
