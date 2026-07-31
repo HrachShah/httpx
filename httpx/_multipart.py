@@ -56,7 +56,7 @@ def _guess_content_type(filename: str | None) -> str | None:
 def get_multipart_boundary_from_content_type(
     content_type: bytes | None,
 ) -> bytes | None:
-    if not content_type or not content_type.startswith(b"multipart/form-data"):
+    if not content_type or not content_type.lower().startswith(b"multipart/form-data"):
         return None
     # parse boundary according to
     # https://www.rfc-editor.org/rfc/rfc2046#section-5.1.1

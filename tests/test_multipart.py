@@ -76,6 +76,17 @@ def test_multipart_explicit_boundary(header: str) -> None:
     )
 
 
+def test_multipart_explicit_boundary_accepts_mixed_case_media_type() -> None:
+    client = httpx.Client(transport=httpx.MockTransport(echo_request_content))
+
+    files = {"file": io.BytesIO(b"<file content>")}
+    headers = {"content-type": "Multipart/Form-Data; boundary=+++"}
+    response = client.post("http://127.0.0.1:8000/", files=files, headers=headers)
+
+    assert response.status_code == 200
+    assert b"--+++\r\n" in response.content
+
+
 @pytest.mark.parametrize(
     "header",
     [
