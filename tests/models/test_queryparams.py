@@ -50,6 +50,14 @@ def test_queryparams(source):
     assert httpx.QueryParams(q) == q
 
 
+def test_queryparams_rejects_multiple_constructor_sources():
+    with pytest.raises(TypeError, match="at most one positional argument"):
+        httpx.QueryParams("a=1", "b=2")
+
+    with pytest.raises(TypeError, match="cannot mix positional and keyword"):
+        httpx.QueryParams("a=1", b="2")
+
+
 def test_queryparam_types():
     q = httpx.QueryParams(None)
     assert str(q) == ""
