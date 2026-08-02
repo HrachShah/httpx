@@ -225,6 +225,15 @@ def test_parse_header_links_preserves_semicolons_in_quoted_values():
     assert response.links["/page"]["title"] == "part one; part two"
 
 
+def test_parse_header_links_ignores_angle_brackets_in_quoted_values():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; title="part <one>"; rel=next'},
+    )
+
+    assert response.links["next"]["title"] == "part <one>"
+
+
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}

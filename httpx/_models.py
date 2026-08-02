@@ -111,6 +111,52 @@ def _split_header_params(value: str) -> list[str]:
     return parts
 
 
+def _find_next_link_start(value: str, start: int) -> int:
+    quoted = False
+    escaped = False
+    for index in range(start, len(value)):
+        char = value[index]
+        if escaped:
+            escaped = False
+        elif char == "\\" and quoted:
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif char == "<" and not quoted:
+            return index
+    return -1
+def _find_next_link_start(value: str, start: int) -> int:
+    quoted = False
+    escaped = False
+    for index in range(start, len(value)):
+        char = value[index]
+        if escaped:
+            escaped = False
+        elif char == "\\" and quoted:
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif char == "<" and not quoted:
+            return index
+    return -1
+
+
+def _find_next_link_start(value: str, start: int) -> int:
+    quoted = False
+    escaped = False
+    for index in range(start, len(value)):
+        char = value[index]
+        if escaped:
+            escaped = False
+        elif char == "\\" and quoted:
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif char == "<" and not quoted:
+            return index
+    return -1
+
+
 def _parse_header_links(value: str) -> list[dict[str, str]]:
     """
     Returns a list of parsed link headers, for more info see:
@@ -137,7 +183,7 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
         if not url:
             continue
         tail = value[url_match.end():]
-        next_url = tail.find("<")
+        next_url = _find_next_link_start(tail, 0)
         params = tail if next_url == -1 else tail[:next_url]
         params = params.rstrip(" ,")
         link = {"url": url}
