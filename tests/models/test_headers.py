@@ -214,6 +214,15 @@ def test_parse_header_links(value, expected):
     assert all(link in all_links for link in expected)
 
 
+def test_parse_header_links_preserves_equals_in_parameter_values():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; title=part=one'},
+    )
+
+    assert response.links["/page"]["title"] == "part=one"
+
+
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}
