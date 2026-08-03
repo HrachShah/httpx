@@ -231,7 +231,7 @@ def test_parse_header_links_keeps_later_parameters_after_malformed_entry():
 def test_parse_header_links_skips_empty_segments():
     response = httpx.Response(
         200,
-        headers={"link": ', </page>; rel="next", , </other>; rel="other"'},
+        headers={"link": '<>, </page>; rel="next", <other>; rel="other"'},
     )
 
     assert set(response.links) == {"next", "other"}
