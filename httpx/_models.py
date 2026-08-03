@@ -116,7 +116,10 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
             url, params = val.split(";", 1)
         except ValueError:
             url, params = val, ""
-        link = {"url": url.strip("<> '\"")}
+        url = url.strip("<> '\"")
+        if not url:
+            continue
+        link = {"url": url}
         for param in params.split(";"):
             if "=" not in param:
                 continue
