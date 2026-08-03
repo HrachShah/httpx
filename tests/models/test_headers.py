@@ -234,6 +234,30 @@ def test_parse_header_links_ignores_angle_brackets_in_quoted_values():
     assert response.links["next"]["title"] == "part <one>"
 
 
+def test_parse_header_links_finds_links_after_quoted_angle_brackets():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; title="part <one>", </next>; rel=next'},
+    )
+
+    assert response.links["next"] == {
+        "url": "/next",
+        "rel": "next",
+    }
+
+
+def test_parse_header_links_does_not_treat_quoted_link_as_next_link():
+    response = httpx.Response(
+        200,
+        headers={"link": '</page>; title="<not-a-link>", </next>; rel=next'},
+    )
+
+    assert list(response.links.values()) == [
+        {"url": "/page", "title": "<not-a-link>"},
+        {"url": "/next", "rel": "next"},
+    ]
+
+
 def test_parse_header_links_no_link():
     all_links = httpx.Response(200).links
     assert all_links == {}

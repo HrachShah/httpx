@@ -114,36 +114,14 @@ def _split_header_params(value: str) -> list[str]:
 def _find_next_link_start(value: str, start: int) -> int:
     quoted = False
     escaped = False
-    for index in range(start, len(value)):
-        char = value[index]
+    for char in value[:start]:
         if escaped:
             escaped = False
         elif char == "\\" and quoted:
             escaped = True
         elif char == '"':
             quoted = not quoted
-        elif char == "<" and not quoted:
-            return index
-    return -1
-def _find_next_link_start(value: str, start: int) -> int:
-    quoted = False
-    escaped = False
-    for index in range(start, len(value)):
-        char = value[index]
-        if escaped:
-            escaped = False
-        elif char == "\\" and quoted:
-            escaped = True
-        elif char == '"':
-            quoted = not quoted
-        elif char == "<" and not quoted:
-            return index
-    return -1
 
-
-def _find_next_link_start(value: str, start: int) -> int:
-    quoted = False
-    escaped = False
     for index in range(start, len(value)):
         char = value[index]
         if escaped:
@@ -178,23 +156,27 @@ def _parse_header_links(value: str) -> list[dict[str, str]]:
     value = value.strip(replace_chars)
     if not value:
         return links
-    for url_match in re.finditer(r"<([^>]*)>", value):
-        url = url_match.group(1).strip().strip(replace_chars)
-        if not url:
-            continue
-        tail = value[url_match.end():]
-        next_url = _find_next_link_start(tail, 0)
-        params = tail if next_url == -1 else tail[:next_url]
-        params = params.rstrip(" ,")
-        link = {"url": url}
-        for param in _split_header_params(params):
-            if "=" not in param:
-                continue
-            key, value = param.split("=", 1)
-            key = key.strip(replace_chars)
-            if key:
-                link[key] = value.strip(replace_chars)
-        links.append(link)
+    link_start = _find_next_link_start(value, 0)
+    while link_start != -1:
+        link_end = value.find(">", link_start + 1)
+        if link_end == -1:
+            break
+        url = value[link_start + 1 : link_end].strip().strip(replace_chars)
+        params_start = link_end + 1
+        next_start = _find_next_link_start(value, params_start)
+        if url:
+            params = value[params_start:] if next_start == -1 else value[params_start:next_start]
+            params = params.rstrip(" ,")
+            link = {"url": url}
+            for param in _split_header_params(params):
+                if "=" not in param:
+                    continue
+                key, param_value = param.split("=", 1)
+                key = key.strip(replace_chars)
+                if key:
+                    link[key] = param_value.strip(replace_chars)
+            links.append(link)
+        link_start = next_start
     return links
 
 
