@@ -298,6 +298,12 @@ def test_url_port_int_constructor_validates_range():
     assert str(exc.value) == "Invalid port: '-1'"
 
 
+def test_url_boolean_port_is_rejected():
+    with pytest.raises(TypeError) as exc:
+        httpx.URL(scheme="https", host="example.com", port=True)
+    assert str(exc.value) == "Argument 'port' must be int but got bool"
+
+
 # Tests for path handling
 
 
