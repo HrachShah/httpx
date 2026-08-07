@@ -112,6 +112,19 @@ def test_get_environment_proxies(environment, proxies):
     assert get_environment_proxies() == proxies
 
 
+def test_get_environment_proxies_ignores_invalid_ip_hosts(monkeypatch):
+    monkeypatch.setenv("NO_PROXY", "999.999.999.999,not-an-ip")
+    monkeypatch.delenv("no_proxy", raising=False)
+    monkeypatch.delenv("HTTP_PROXY", raising=False)
+    monkeypatch.delenv("HTTPS_PROXY", raising=False)
+    monkeypatch.delenv("ALL_PROXY", raising=False)
+
+    assert get_environment_proxies() == {
+        "all://*999.999.999.999": None,
+        "all://*not-an-ip": None,
+    }
+
+
 @pytest.mark.parametrize(
     ["pattern", "url", "expected"],
     [
