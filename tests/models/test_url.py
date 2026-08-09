@@ -255,6 +255,13 @@ def test_url_invalid_port():
     assert str(exc.value) == "Invalid port: 'abc'"
 
 
+@pytest.mark.parametrize("port", ["１２", "١٢", "+80", " 80"])
+def test_url_rejects_non_ascii_or_signed_ports(port):
+    with pytest.raises(httpx.InvalidURL) as exc:
+        httpx.URL(f"https://example.com:{port}/")
+    assert str(exc.value) == f"Invalid port: {port!r}"
+
+
 def test_url_port_above_max_raises():
     # TCP/UDP port numbers are 16 bits (0..65535); values above 65535 are
     # outside the valid range and must be rejected at the URL boundary

@@ -405,9 +405,12 @@ def normalize_port(port: str | int | None, scheme: str) -> int | None:
     if port is None or port == "":
         return None
 
+    if isinstance(port, str) and (not port.isascii() or not port.isdecimal()):
+        raise InvalidURL(f"Invalid port: {port!r}")
+
     try:
         port_as_int = int(port)
-    except ValueError:
+    except (TypeError, ValueError):
         raise InvalidURL(f"Invalid port: {port!r}")
 
     # TCP/UDP port numbers are unsigned 16-bit integers (RFC 793 § 3.1, IANA
