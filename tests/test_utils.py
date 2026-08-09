@@ -35,6 +35,13 @@ def test_bad_utf_like_encoding():
         response.json()
 
 
+def test_unquote_short_values():
+    from httpx._utils import unquote
+
+    assert unquote("") == ""
+    assert unquote("a") == "a"
+
+
 @pytest.mark.parametrize(
     ("encoding", "expected"),
     (
