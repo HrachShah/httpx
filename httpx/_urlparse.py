@@ -405,6 +405,9 @@ def normalize_port(port: str | int | None, scheme: str) -> int | None:
     if port is None or port == "":
         return None
 
+    if isinstance(port, bool):
+        raise TypeError("Argument 'port' must be int but got bool")
+
     if isinstance(port, str) and (not port.isascii() or not port.isdecimal()):
         raise InvalidURL(f"Invalid port: {port!r}")
 
